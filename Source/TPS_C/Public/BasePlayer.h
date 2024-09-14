@@ -36,6 +36,9 @@ private:
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="PlayerCamera",meta=(AllowPrivateAccess="true"))
 	class UCameraComponent* PlayerCamera;
 
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="PlayerCamera",meta=(AllowPrivateAccess="true"))
+	class UBoxComponent* TouchCollision;
+
 	//玩家输入映射
 	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="PlayerInput",meta=(AllowPrivateAccess="true"))
 	class UInputMappingContext* PlayerInputMapping;
@@ -70,22 +73,35 @@ private:
 	float AimFOV;
 	float CurrentFOV;
 	bool b_isAim;
+	bool isAiming;
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Shoot",meta=(AllowPrivateAccess="true"),meta=(ClampMin="0.0",ClampMax="1.0",UIMin="0.0",UIMax="1.0"))
 	float AimLookRate;
 	float DefaultLookRate;
 	float CurrentLookRate;
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Shoot",meta=(AllowPrivateAccess="true"))
-	class UCurveFloat* CurveAim;
+	class UCurveFloat* AimCurve;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Shoot",meta=(AllowPrivateAccess="true"))
+	class UCurveFloat* ShootCurve;
 	class UTimelineComponent* AimTimeline;
+	class UTimelineComponent* ShootTimeline;
+
 
 	UFUNCTION()
 	void AimUpdate(float Alpha);
+	UFUNCTION()
+	void AimFinish();
+	UFUNCTION()
+	void ShootChUpdate(float Alpha);
+	UFUNCTION()
+	void ShootChFinish();
+	
 
 	
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
-	void Shoot(const FInputActionValue& Value);
+	void Shoot();
+	void ShootComplete();
 	void AimIn();
 	void AimOut();
 	//void InterpFOV(float DeltaTime);
@@ -97,4 +113,16 @@ private:
 
 public:
 	FORCEINLINE bool GetIsAim() const {return b_isAim;}
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Shoot",meta=(AllowPrivateAccess="true"))
+	float ShootDuration;
+	bool bFire;
+	bool bIsShooting;
+	FTimerHandle ShootTimer;
+	FTimerHandle ShootFinishTimer;
+	UFUNCTION()
+	void Fire_Start();
+	UFUNCTION()
+	void Fire_Finish();
+	UFUNCTION()
+	void CheckCh();
 };

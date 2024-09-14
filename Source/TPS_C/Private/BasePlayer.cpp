@@ -7,6 +7,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Camera/CameraComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -16,6 +17,9 @@
 #include "Sound/SoundCue.h"
 
 FOnTimelineFloat AimTimelineFloat;
+FOnTimelineEvent AimTimelineFinish;
+FOnTimelineFloat ShootTimelineFloat;
+FOnTimelineEvent ShootTimelineFinish;
 
 // Sets default values
 ABasePlayer::ABasePlayer()
@@ -50,9 +54,16 @@ ABasePlayer::ABasePlayer()
 	DefaultLookRate = 1.f;
 	AimLookRate = 0.3f;
 	CurrentLookRate = DefaultLookRate;
+	ShootDuration = 0.2f;
+	bFire = false;
+	bIsShooting = false;
 
 	//设置时间轴
 	AimTimeline = CreateDefaultSubobject<UTimelineComponent>("AimTimeline");
+	ShootTimeline = CreateDefaultSubobject<UTimelineComponent>("ShootTimeline");
+
+	TouchCollision = CreateDefaultSubobject<UBoxComponent>("TouchCollision");
+	TouchCollision->SetupAttachment(RootComponent);
 }
 
 // Called when the game starts or when spawned
@@ -69,15 +80,26 @@ void ABasePlayer::BeginPlay()
 		{
 			LocalSS->AddMappingContext(PlayerInputMapping,0);
 		}
-		PlayerControl->PlayerCameraManager->ViewPitchMax = 10.f;
-		PlayerControl->PlayerCameraManager->ViewPitchMin = -10.f;
+		//设置摄像机视角限制
+		PlayerControl->PlayerCameraManager->ViewPitchMax = 400.f;
+		PlayerControl->PlayerCameraManager->ViewPitchMin = -40.f;
 	}
 
 	//绑定时间轴
-	if(CurveAim)
+	if(AimCurve)
 	{
 		AimTimelineFloat.BindUFunction(this,FName("AimUpdate"));
-		AimTimeline->AddInterpFloat(CurveAim,AimTimelineFloat);
+		AimTimeline->AddInterpFloat(AimCurve,AimTimelineFloat);
+		AimTimelineFinish.BindUFunction(this,FName("AimFinish"));
+		AimTimeline->SetTimelineFinishedFunc(AimTimelineFinish);
+	}
+	if(ShootCurve)
+	{
+		ShootTimelineFloat.BindUFunction(this,FName("ShootChUpdate"));
+		ShootTimeline->AddInterpFloat(ShootCurve,ShootTimelineFloat);
+		ShootTimelineFinish.BindUFunction(this,FName("ShootChFinish"));
+		ShootTimeline->SetTimelineFinishedFunc(ShootTimelineFinish);
+		
 	}
 	
 	//HUD
@@ -87,6 +109,8 @@ void ABasePlayer::BeginPlay()
 		BaseHUD->AddToViewport(0);
 		BaseHUD->UpdatedHP(.9f);
 	}
+
+
 }
 
 // Called every frame
@@ -107,11 +131,10 @@ void ABasePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		PlayerInputC->BindAction(PlayerLook,ETriggerEvent::Triggered,this,&ABasePlayer::Look);
 		PlayerInputC->BindAction(PlayerJump,ETriggerEvent::Started,this,&ABasePlayer::Jump);
 		PlayerInputC->BindAction(PlayerJump,ETriggerEvent::Completed,this,&ABasePlayer::StopJumping);
-		PlayerInputC->BindAction(PlayerShoot,ETriggerEvent::Started,this,&ABasePlayer::Shoot);
+		PlayerInputC->BindAction(PlayerShoot,ETriggerEvent::Started,this,&ABasePlayer::Fire_Start);
 		PlayerInputC->BindAction(PlayerAim,ETriggerEvent::Started,this,&ABasePlayer::AimIn);
 		PlayerInputC->BindAction(PlayerAim,ETriggerEvent::Completed,this,&ABasePlayer::AimOut);
-
-
+		PlayerInputC->BindAction(PlayerShoot,ETriggerEvent::Completed,this,&ABasePlayer::ShootComplete);
 	}
 }
 
@@ -120,10 +143,31 @@ void ABasePlayer::AimUpdate(float Alpha)
 {
 	float updatedFOV = FMath::Lerp(CurrentFOV,AimFOV,Alpha);
 	PlayerCamera->SetFieldOfView(updatedFOV);
+	
 	CurrentLookRate = DefaultLookRate;
 	float updatedLookRate = FMath::Lerp(CurrentLookRate,AimLookRate,Alpha);
 	CurrentLookRate = updatedLookRate;
+
+	BaseHUD->UpdateAimChTranslate(Alpha,10.f);
 }
+
+void ABasePlayer::AimFinish()
+{
+	isAiming =false;
+	BaseHUD->GetCurrentChTranslate();
+}
+
+//射击时准星更新
+void ABasePlayer::ShootChUpdate(float Alpha)
+{
+	BaseHUD->UpdateShootChTranslate(Alpha,-5.f);
+}
+
+void ABasePlayer::ShootChFinish()
+{
+	
+}
+
 
 void ABasePlayer::Move(const FInputActionValue& Value)
 {
@@ -149,7 +193,7 @@ void ABasePlayer::Look(const FInputActionValue& Value)
 	}
 }
 
-void ABasePlayer::Shoot(const FInputActionValue& Value)
+void ABasePlayer::Shoot()
 {
 	if(ShootSound)
 	{
@@ -162,6 +206,7 @@ void ABasePlayer::Shoot(const FInputActionValue& Value)
 	const FRotator SocketRotation = GetMesh()->GetSocketRotation("MuzzleSocket");
 	const FVector SocketScale(1,1,1);
 
+	//设置射击枪口粒子
 	if(P_ShootMuzzle)
 	{
 		UGameplayStatics::SpawnEmitterAttached(P_ShootMuzzle,GetMesh(),"MuzzleSocket",SocketLoaction,SocketRotation,SocketScale,EAttachLocation::KeepWorldPosition);
@@ -172,22 +217,25 @@ void ABasePlayer::Shoot(const FInputActionValue& Value)
 	{
 		GEngine->GameViewport->GetViewportSize(Size_ViewPort);
 	}
-	const FVector2d CrossHair2D(Size_ViewPort.X/2.f,Size_ViewPort.Y/2.f);
+	const FVector2d CrossHair2D(Size_ViewPort.X/2.f,Size_ViewPort.Y/2.f);	//获取屏幕中心点
 	bool SetScreenToWorld;
-	FVector CrossHairWp;
-	FVector CrossHairWd;
+	FVector CrossHairWp;	//世界坐标
+	FVector CrossHairWd;	//方向
+
+	//获取屏幕中心点的世界坐标
 	SetScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(UGameplayStatics::GetPlayerController(this,0),CrossHair2D,CrossHairWp,CrossHairWd);
 	if(SetScreenToWorld)
 	{
 		FHitResult ShootHit;
-		const FVector ShootStart = CrossHairWp;
-		const FVector ShootEnd = CrossHairWp + CrossHairWd*30000.f;
-		FVector ShootBeamEnd;
+		const FVector ShootStart = CrossHairWp;	//射击起点
+		const FVector ShootEnd = CrossHairWp + CrossHairWd*30000.f;	//射击终点
+		FVector ShootBeamEnd;	//射击光束终点
 		//射线检测
 		GetWorld()->LineTraceSingleByChannel(ShootHit,ShootStart,ShootEnd,ECC_Visibility);
 		if(ShootHit.bBlockingHit)
 		{
 			//DrawDebugPoint(GetWorld(),ShootHit.Location,6.f,FColor::Green,false,3.f);
+			//设置射击命中粒子
 			if(P_ShootHit)
 			{
 				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),P_ShootHit,ShootHit.Location);
@@ -205,16 +253,88 @@ void ABasePlayer::Shoot(const FInputActionValue& Value)
 	}
 }
 
+void ABasePlayer::ShootComplete()
+{
+	bFire = false;
+}
+
+//瞄准状态切换
 void ABasePlayer::AimIn()
 {
 	b_isAim = true;
 	AimTimeline->Play();
+	isAiming = true;
 }
-
 void ABasePlayer::AimOut()
 {
 	b_isAim = false;
+	isAiming = true;
 	AimTimeline->Reverse();
+}
+
+//开火定时器开始
+void ABasePlayer::Fire_Start()
+{
+	//设置定时器
+	if(bIsShooting)
+	{
+		
+	}
+	else
+	{
+		bFire = true;
+		bIsShooting = true;
+		Shoot();
+		GetWorldTimerManager().SetTimer(ShootTimer,this,&ABasePlayer::Fire_Finish,ShootDuration);
+
+		//如果定时器没有停止情况下射击，不重新获取当前变换; 如果停止况下重新射击则重新获取变换值
+		if(isAiming)
+		{
+			ShootTimeline->Stop();
+		}
+		else
+		{
+			if(ShootTimeline->IsPlaying())
+			{
+				ShootTimeline->PlayFromStart();
+			}
+			else
+			{
+				BaseHUD->GetCurrentChTranslate();
+				ShootTimeline->PlayFromStart();
+			}
+		}
+	}
+}
+
+//开火定时器结束
+void ABasePlayer::Fire_Finish()
+{
+	bIsShooting = false;
+	ShootTimeline->Reverse();
+	if(bFire)
+	{
+		Fire_Start();
+	}
+	else
+	{
+		GetWorldTimerManager().SetTimer(ShootFinishTimer,this,&ABasePlayer::CheckCh,0.5f);
+
+	}
+
+}
+
+//射击时准星校正
+void ABasePlayer::CheckCh()
+{
+	if(b_isAim)
+	{
+		AimTimeline->Play();
+	}
+	else
+	{
+		AimTimeline->Reverse();
+	}
 }
 
 /*void ABasePlayer::InterpFOV(float DeltaTime)

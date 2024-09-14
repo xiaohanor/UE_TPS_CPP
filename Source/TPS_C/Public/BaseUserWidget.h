@@ -16,9 +16,23 @@ class TPS_C_API UBaseUserWidget : public UUserWidget
 
 public:
 	void virtual NativeConstruct() override;
+	UFUNCTION()
 	void UpdatedHP(float Percent);
+	UFUNCTION()
+	void UpdateAimChTranslate(float Alpha,float Value);
+	UFUNCTION()
+	void UpdateShootChTranslate(float Alpha,float Value);
+	UFUNCTION()
+	void GetCurrentChTranslate() const;
 private:
 	UPROPERTY(Transient,meta=(BindWidget))
 	class UProgressBar* HPBar;
-	
+	UPROPERTY(Transient,meta=(BindWidget))
+	class UImage* CrossHair_R;
+	UPROPERTY(Transient,meta=(BindWidget))
+	class UImage* CrossHair_L;
+	UPROPERTY(Transient,meta=(BindWidget))
+	class UImage* CrossHair_U;
+	UPROPERTY(Transient,meta=(BindWidget))
+	class UImage* CrossHair_D;
 };
