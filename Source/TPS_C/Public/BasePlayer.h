@@ -73,7 +73,7 @@ private:
 	float AimFOV;
 	float CurrentFOV;
 	bool b_isAim;
-	bool isAiming;
+	bool isAiming; 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Shoot",meta=(AllowPrivateAccess="true"),meta=(ClampMin="0.0",ClampMax="1.0",UIMin="0.0",UIMax="1.0"))
 	float AimLookRate;
 	float DefaultLookRate;

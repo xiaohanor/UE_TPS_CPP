@@ -231,7 +231,7 @@ void ABasePlayer::Shoot()
 		const FVector ShootEnd = CrossHairWp + CrossHairWd*30000.f;	//射击终点
 		FVector ShootBeamEnd;	//射击光束终点
 		//射线检测
-		GetWorld()->LineTraceSingleByChannel(ShootHit,ShootStart,ShootEnd,ECC_Visibility);
+		GetWorld()->LineTraceSingleByChannel(ShootHit,ShootStart,ShootEnd,ECC_Pawn);
 		if(ShootHit.bBlockingHit)
 		{
 			//DrawDebugPoint(GetWorld(),ShootHit.Location,6.f,FColor::Green,false,3.f);
