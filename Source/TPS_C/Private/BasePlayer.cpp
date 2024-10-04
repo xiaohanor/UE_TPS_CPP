@@ -3,6 +3,7 @@
 
 #include "BasePlayer.h"
 
+#include "Actor_Items.h"
 #include "BaseUserWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -20,6 +21,7 @@ FOnTimelineFloat AimTimelineFloat;
 FOnTimelineEvent AimTimelineFinish;
 FOnTimelineFloat ShootTimelineFloat;
 FOnTimelineEvent ShootTimelineFinish;
+FHitResult ItemHitResult;
 
 // Sets default values
 ABasePlayer::ABasePlayer()
@@ -110,6 +112,8 @@ void ABasePlayer::BeginPlay()
 		BaseHUD->UpdatedHP(.9f);
 	}
 
+	bCheckItems = false;
+
 
 }
 
@@ -117,6 +121,9 @@ void ABasePlayer::BeginPlay()
 void ABasePlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	//检视可交互物品
+	CheckItems();
 }
 
 // Called to bind functionality to input
@@ -334,6 +341,90 @@ void ABasePlayer::CheckCh()
 	else
 	{
 		AimTimeline->Reverse();
+	}
+}
+
+bool ABasePlayer::ItemTrace(FHitResult& HitResult)
+{
+	FVector2d Size_ViewPort;
+	if(GEngine->GameViewport)
+	{
+		GEngine->GameViewport->GetViewportSize(Size_ViewPort);
+	}
+	const FVector2d CrossHair2D(Size_ViewPort.X/2.f,Size_ViewPort.Y/2.f);	//获取屏幕中心点
+	bool SetScreenToWorld;
+	FVector CrossHairWp;	//世界坐标
+	FVector CrossHairWd;	//方向
+
+	//获取屏幕中心点的世界坐标
+	SetScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(UGameplayStatics::GetPlayerController(this,0),CrossHair2D,CrossHairWp,CrossHairWd);
+	if(SetScreenToWorld)
+	{
+		const FVector LookStart = CrossHairWp;	//起点
+		const FVector LookEnd = CrossHairWp + CrossHairWd*3000.f;	//终点
+		//射线检测
+		GetWorld()->LineTraceSingleByChannel(HitResult,LookStart,LookEnd,ECC_Visibility);
+		if(HitResult.bBlockingHit)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void ABasePlayer::UpdateCheckItemsCount(int Count)
+{
+	CheckItemsCount+=Count;
+	if(CheckItemsCount>0)
+	{
+		bCheckItems = true;
+	}
+	else
+	{
+		bCheckItems = false;
+	}
+}
+
+void ABasePlayer::CheckItems()
+{
+	if(bCheckItems)
+	{
+		//交互物品射线检测
+		bool bLookedItem=ItemTrace(ItemHitResult);
+		if(bLookedItem)
+		{
+			//设置物品拾取UI可见
+			AActor_Items* Item = Cast<AActor_Items>(ItemHitResult.GetActor());
+			if(Item)
+			{
+				if(Item==BeforeLookedItem)
+				{
+					return;
+				}
+				if(BeforeLookedItem)
+				{
+					BeforeLookedItem->SetWidgetVisibility(false);
+				}
+				BeforeLookedItem = Item;
+				BeforeLookedItem->SetWidgetVisibility(true);
+			}
+			else
+			{
+				if(BeforeLookedItem)
+				{
+					BeforeLookedItem->SetWidgetVisibility(false);
+					BeforeLookedItem = nullptr;
+				}
+			}
+		}
+	}
+	else
+	{
+		if(BeforeLookedItem)
+		{
+			BeforeLookedItem->SetWidgetVisibility(false);
+			BeforeLookedItem = nullptr;
+		}
 	}
 }
 

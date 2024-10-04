@@ -112,6 +112,7 @@ private:
 	class UBaseUserWidget* BaseHUD;
 
 public:
+	//开火瞄准相关
 	FORCEINLINE bool GetIsAim() const {return b_isAim;}
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Shoot",meta=(AllowPrivateAccess="true"))
 	float ShootDuration;
@@ -125,4 +126,15 @@ public:
 	void Fire_Finish();
 	UFUNCTION()
 	void CheckCh();
+
+	//物品检测
+	UFUNCTION()
+	bool ItemTrace(FHitResult& HitResult);
+	UFUNCTION()
+	void UpdateCheckItemsCount(int Count);
+	UFUNCTION()
+	void CheckItems();
+	class AActor_Items* BeforeLookedItem;
+	bool bCheckItems;
+	int CheckItemsCount;
 };

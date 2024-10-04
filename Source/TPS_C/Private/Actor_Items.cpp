@@ -3,7 +3,9 @@
 
 #include "Actor_Items.h"
 
+#include "BasePlayer.h"
 #include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 
 // Sets default values
@@ -14,17 +16,29 @@ AActor_Items::AActor_Items()
 
 	BoxCollision = CreateDefaultSubobject<UBoxComponent>("BoxCollision");
 	BoxCollision->SetupAttachment(RootComponent);
+	
+	SphereCollision = CreateDefaultSubobject<USphereComponent>("SphereCollision");
+	SphereCollision->SetupAttachment(BoxCollision);
+	SphereCollision->SetSphereRadius(150.f);
+	
 	SkeletalMesh = CreateDefaultSubobject<USkeletalMeshComponent>("SkeletalMesh");
 	SkeletalMesh->SetupAttachment(BoxCollision);
+	
 	ItemPickUpWidget = CreateDefaultSubobject<UWidgetComponent>("ItemPickUpWidget");
 	ItemPickUpWidget->SetupAttachment(BoxCollision);
+
+	BoxCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+	BoxCollision->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
 }
 
 // Called when the game starts or when spawned
 void AActor_Items::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	SetWidgetVisibility(false);
+
+	SphereCollision->OnComponentBeginOverlap.AddDynamic(this,&AActor_Items::OnOverlapBegin);
+	SphereCollision->OnComponentEndOverlap.AddDynamic(this,&AActor_Items::OnOverlapEnd);
 }
 
 // Called every frame
@@ -32,5 +46,40 @@ void AActor_Items::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+}
+
+//设置Widget的可见性
+void AActor_Items::SetWidgetVisibility(bool bVisible)
+{
+	ItemPickUpWidget->SetVisibility(bVisible);
+}
+
+//当物品与玩家重叠时
+void AActor_Items::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if(OtherActor)
+	{
+		ABasePlayer* Player = Cast<ABasePlayer>(OtherActor);
+		if(Player)
+		{
+			Player->UpdateCheckItemsCount(1);
+		}
+	}
+		
+}
+
+//当物品与玩家结束重叠时
+void AActor_Items::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if(OtherActor)
+	{
+		ABasePlayer* Player = Cast<ABasePlayer>(OtherActor);
+		if(Player)
+		{
+			Player->UpdateCheckItemsCount(-1);
+		}
+	}
 }
 
