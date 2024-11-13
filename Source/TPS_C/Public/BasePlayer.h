@@ -94,10 +94,8 @@ private:
 	void ShootChUpdate(float Alpha);
 	UFUNCTION()
 	void ShootChFinish();
-	
-
-	
-
+		
+	//玩家输入函数
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void Shoot();
@@ -110,6 +108,13 @@ private:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="HUD",meta=(AllowPrivateAccess="true"))
 	TSubclassOf<class UUserWidget> BaseUserWidget;
 	class UBaseUserWidget* BaseHUD;
+
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Weapon",meta=(AllowPrivateAccess="true"))
+	class AActor_Weapons* Weapons;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Weapon",meta=(AllowPrivateAccess="true"))
+	TSubclassOf<class AActor_Weapons> WeaponsClass;
+	UFUNCTION()
+	void SpawnWeapons();
 
 public:
 	//开火瞄准相关
@@ -137,4 +142,5 @@ public:
 	class AActor_Items* BeforeLookedItem;
 	bool bCheckItems;
 	int CheckItemsCount;
+
 };

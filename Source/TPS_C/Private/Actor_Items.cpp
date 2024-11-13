@@ -4,6 +4,7 @@
 #include "Actor_Items.h"
 
 #include "BasePlayer.h"
+#include "ItemsUserWidget.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
@@ -27,6 +28,8 @@ AActor_Items::AActor_Items()
 	ItemPickUpWidget = CreateDefaultSubobject<UWidgetComponent>("ItemPickUpWidget");
 	ItemPickUpWidget->SetupAttachment(BoxCollision);
 
+	WeaponName = "DefaultName";
+
 	BoxCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
 	BoxCollision->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
 }
@@ -39,6 +42,13 @@ void AActor_Items::BeginPlay()
 
 	SphereCollision->OnComponentBeginOverlap.AddDynamic(this,&AActor_Items::OnOverlapBegin);
 	SphereCollision->OnComponentEndOverlap.AddDynamic(this,&AActor_Items::OnOverlapEnd);
+
+	ItemsWidget = Cast<UItemsUserWidget>(ItemPickUpWidget->GetWidget());
+
+	if(ItemsWidget)
+	{
+		ItemsWidget->SetWeaponName(WeaponName);
+	}
 }
 
 // Called every frame
@@ -52,6 +62,12 @@ void AActor_Items::Tick(float DeltaTime)
 void AActor_Items::SetWidgetVisibility(bool bVisible)
 {
 	ItemPickUpWidget->SetVisibility(bVisible);
+}
+
+void AActor_Items::CloseAllCollision()
+{
+	BoxCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 //当物品与玩家重叠时

@@ -4,6 +4,7 @@
 #include "BasePlayer.h"
 
 #include "Actor_Items.h"
+#include "Actor_Weapons.h"
 #include "BaseUserWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -64,6 +65,7 @@ ABasePlayer::ABasePlayer()
 	AimTimeline = CreateDefaultSubobject<UTimelineComponent>("AimTimeline");
 	ShootTimeline = CreateDefaultSubobject<UTimelineComponent>("ShootTimeline");
 
+	//绑定AI触碰感知碰撞体
 	TouchCollision = CreateDefaultSubobject<UBoxComponent>("TouchCollision");
 	TouchCollision->SetupAttachment(RootComponent);
 }
@@ -72,6 +74,8 @@ ABasePlayer::ABasePlayer()
 void ABasePlayer::BeginPlay()
 {
 	Super::BeginPlay();
+
+	SpawnWeapons();
 
 	//注册增强输入子系统
 	APlayerController* PlayerControl = Cast<APlayerController>(Controller);
@@ -279,6 +283,17 @@ void ABasePlayer::AimOut()
 	AimTimeline->Reverse();
 }
 
+void ABasePlayer::SpawnWeapons()
+{
+	if(WeaponsClass)
+	{
+		Weapons = GetWorld()->SpawnActor<AActor_Weapons>(WeaponsClass);
+		const USkeletalMeshSocket* WeaponSocket = GetMesh()->GetSocketByName("WeaponSocket");
+		WeaponSocket->AttachActor(Weapons,GetMesh());
+		Weapons->CloseAllCollision();
+	}
+}
+
 //开火定时器开始
 void ABasePlayer::Fire_Start()
 {
@@ -427,6 +442,7 @@ void ABasePlayer::CheckItems()
 		}
 	}
 }
+
 
 /*void ABasePlayer::InterpFOV(float DeltaTime)
 {

@@ -27,6 +27,9 @@ public:
 	void SetWidgetVisibility(bool bVisible);
 
 	UFUNCTION()
+	void CloseAllCollision();
+
+	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent,AActor* OtherActor,UPrimitiveComponent* OtherComp,int32 OtherBodyIndex,bool bFromSweep,const FHitResult& SweepResult);
 
 	UFUNCTION()
@@ -41,6 +44,12 @@ private:
 	
 	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Component",meta=(AllowPrivateAccess = "true"))
 	class UWidgetComponent* ItemPickUpWidget;
+
+	UPROPERTY()
+	class UItemsUserWidget* ItemsWidget;
+
+	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Attribute",meta=(AllowPrivateAccess = "true"))
+	FString WeaponName;
 
 	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Component",meta=(AllowPrivateAccess = "true"))
 	class USphereComponent* SphereCollision;
